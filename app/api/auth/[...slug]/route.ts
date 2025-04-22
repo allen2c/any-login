@@ -28,7 +28,10 @@ async function handler(
   { params }: { params: { slug: string[] } }
 ) {
   // Make sure params.slug is properly accessed in an async context
-  const slugArray = Array.isArray(params.slug) ? params.slug : [];
+  const resolvedParams = await params;
+  const slugArray = Array.isArray(resolvedParams.slug)
+    ? resolvedParams.slug
+    : [];
   const slug = slugArray.join("/");
   const targetUrl = `${AUTH_API_URL}/${slug}`;
 
