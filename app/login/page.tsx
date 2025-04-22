@@ -20,6 +20,7 @@ export default function LoginPage() {
         grant_type: "password",
         username: username,
         password: password,
+        scope: "openid profile email",
       };
 
       const response = await fetch(`/api/auth/oauth2/token`, {
@@ -59,13 +60,13 @@ export default function LoginPage() {
             className="block text-gray-700 text-sm font-bold mb-2"
             htmlFor="username"
           >
-            Username
+            Username or Email
           </label>
           <input
             className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
             id="username"
             type="text"
-            placeholder="Username"
+            placeholder="Username or Email"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             required

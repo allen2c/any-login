@@ -27,7 +27,9 @@ async function handler(
   req: NextRequest,
   { params }: { params: { slug: string[] } }
 ) {
-  const slug = params.slug.join("/");
+  // Make sure params.slug is properly accessed in an async context
+  const slugArray = Array.isArray(params.slug) ? params.slug : [];
+  const slug = slugArray.join("/");
   const targetUrl = `${AUTH_API_URL}/${slug}`;
 
   // Get tokens from request cookies
