@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { UserCreateRequest, UserRegistrationResponse } from "../types/auth";
 
 export default function RegisterPage() {
   const [username, setUsername] = useState("");
@@ -19,17 +20,25 @@ export default function RegisterPage() {
       process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:8000";
 
     try {
+      // Create request body using our type definition
+      const requestBody: UserCreateRequest = {
+        username,
+        email,
+        password,
+      };
+
+      // Add client_id (not in the UserCreateRequest interface)
+      const payload = {
+        ...requestBody,
+        client_id: process.env.NEXT_PUBLIC_CLIENT_ID || "any-login",
+      };
+
       const response = await fetch(`${apiUrl}/v1/users/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          username,
-          email,
-          password,
-          client_id: process.env.NEXT_PUBLIC_CLIENT_ID || "any-login",
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -38,6 +47,10 @@ export default function RegisterPage() {
           errorData.detail || `Registration failed: ${response.statusText}`
         );
       }
+
+      // Parse response with our typed interface
+      const data: UserRegistrationResponse = await response.json();
+      console.log("Registration successful:", data);
 
       // Registration successful, redirect to login
       router.push("/login");

@@ -4,15 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-
-interface UserInfo {
-  sub?: string;
-  name?: string;
-  preferred_username?: string;
-  email?: string;
-  email_verified?: boolean;
-  picture?: string;
-}
+import { UserInfo } from "./types/auth";
+import { logout } from "./utils/auth";
 
 export default function Home() {
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
@@ -74,11 +67,19 @@ export default function Home() {
     fetchUserInfo();
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-    setUserInfo(null);
-    router.refresh();
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setUserInfo(null);
+      router.refresh();
+    } catch (err) {
+      console.error("Logout error:", err);
+      // Even if API call fails, still clear local tokens
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
+      setUserInfo(null);
+      router.refresh();
+    }
   };
 
   return (

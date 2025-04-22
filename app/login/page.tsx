@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { PasswordGrantRequest, TokenResponse } from "../types/auth";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -18,17 +19,28 @@ export default function LoginPage() {
       process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:8000";
 
     try {
+      // Prepare request body using our type
+      const requestBody: PasswordGrantRequest = {
+        grant_type: "password",
+        username,
+        password,
+        client_id: process.env.NEXT_PUBLIC_CLIENT_ID || "any-login",
+      };
+
+      // Convert to Record<string, string> for URLSearchParams
+      const formData: Record<string, string> = {
+        grant_type: requestBody.grant_type,
+        username: requestBody.username,
+        password: requestBody.password,
+        client_id: requestBody.client_id,
+      };
+
       const response = await fetch(`${apiUrl}/oauth2/token`, {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
         },
-        body: new URLSearchParams({
-          grant_type: "password",
-          username,
-          password,
-          client_id: process.env.NEXT_PUBLIC_CLIENT_ID || "any-login",
-        }),
+        body: new URLSearchParams(formData),
       });
 
       if (!response.ok) {
@@ -38,7 +50,7 @@ export default function LoginPage() {
         );
       }
 
-      const data = await response.json();
+      const data: TokenResponse = await response.json();
 
       // Store the tokens in localStorage (in a real app, consider using HttpOnly cookies)
       localStorage.setItem("accessToken", data.access_token);
