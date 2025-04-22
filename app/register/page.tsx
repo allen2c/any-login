@@ -33,7 +33,14 @@ export default function RegisterPage() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorText = await response.text();
+        console.error("Registration error response:", errorText);
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = {};
+        }
         throw new Error(
           errorData.detail || `Registration failed: ${response.statusText}`
         );
