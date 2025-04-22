@@ -17,6 +17,10 @@ export default function LoginPage() {
 
     const apiUrl =
       process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:8000";
+    const clientId = process.env.NEXT_PUBLIC_CLIENT_ID || "any-login";
+    // Client secret should be securely stored in environment variables
+    const clientSecret = process.env.NEXT_PUBLIC_CLIENT_SECRET || "";
+    const basicAuth = btoa(`${clientId}:${clientSecret}`);
 
     try {
       // Prepare request body using our type
@@ -24,7 +28,7 @@ export default function LoginPage() {
         grant_type: "password",
         username,
         password,
-        client_id: process.env.NEXT_PUBLIC_CLIENT_ID || "any-login",
+        client_id: clientId, // Keep for type compatibility, but won't be sent in body
       };
 
       // Convert to Record<string, string> for URLSearchParams
@@ -32,13 +36,14 @@ export default function LoginPage() {
         grant_type: requestBody.grant_type,
         username: requestBody.username,
         password: requestBody.password,
-        client_id: requestBody.client_id,
+        // client_id removed from body and sent in the header instead
       };
 
       const response = await fetch(`${apiUrl}/oauth2/token`, {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
+          Authorization: `Basic ${basicAuth}`, // Add Basic Auth header
         },
         body: new URLSearchParams(formData),
       });

@@ -15,25 +15,28 @@ export async function refreshAccessToken(
   const apiUrl =
     process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:8000";
   const clientId = process.env.NEXT_PUBLIC_CLIENT_ID || "any-login";
+  const clientSecret = process.env.NEXT_PUBLIC_CLIENT_SECRET || "";
+  const basicAuth = btoa(`${clientId}:${clientSecret}`);
 
   // Create request body
   const requestBody: RefreshTokenGrantRequest = {
     grant_type: "refresh_token",
     refresh_token: refreshToken,
-    client_id: clientId,
+    client_id: clientId, // Keep for type compatibility
   };
 
   // Convert to Record<string, string> for URLSearchParams
   const formData: Record<string, string> = {
     grant_type: requestBody.grant_type,
     refresh_token: requestBody.refresh_token,
-    client_id: requestBody.client_id ?? "",
+    // client_id removed from body and sent in the header instead
   };
 
   const response = await fetch(`${apiUrl}/oauth2/token`, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Basic ${basicAuth}`, // Add Basic Auth header
     },
     body: new URLSearchParams(formData),
   });
@@ -63,25 +66,28 @@ export async function revokeToken(
   const apiUrl =
     process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:8000";
   const clientId = process.env.NEXT_PUBLIC_CLIENT_ID || "any-login";
+  const clientSecret = process.env.NEXT_PUBLIC_CLIENT_SECRET || "";
+  const basicAuth = btoa(`${clientId}:${clientSecret}`);
 
   // Create request body
   const requestBody: TokenRevocationRequest = {
     token,
     token_type_hint: tokenType,
-    client_id: clientId,
+    client_id: clientId, // Keep for type compatibility
   };
 
   // Convert to Record<string, string> for URLSearchParams
   const formData: Record<string, string> = {
     token: requestBody.token,
     token_type_hint: requestBody.token_type_hint ?? "",
-    client_id: requestBody.client_id ?? "",
+    // client_id removed from body and sent in the header instead
   };
 
   const response = await fetch(`${apiUrl}/oauth2/revoke`, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Basic ${basicAuth}`, // Add Basic Auth header
     },
     body: new URLSearchParams(formData),
   });
