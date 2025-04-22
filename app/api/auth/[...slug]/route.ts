@@ -12,14 +12,7 @@ function getBasicAuthHeader(): string | undefined {
       "base64"
     )}`;
   }
-  // Fallback to public client creds if needed
-  const publicClientId = process.env.NEXT_PUBLIC_CLIENT_ID;
-  const publicClientSecret = process.env.NEXT_PUBLIC_CLIENT_SECRET;
-  if (publicClientId && publicClientSecret) {
-    return `Basic ${Buffer.from(
-      `${publicClientId}:${publicClientSecret}`
-    ).toString("base64")}`;
-  }
+
   return undefined;
 }
 
