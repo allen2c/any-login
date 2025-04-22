@@ -16,9 +16,6 @@ export default function RegisterPage() {
     event.preventDefault();
     setError(null);
 
-    const apiUrl =
-      process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:8000";
-
     try {
       // Create request body using our type definition
       const requestBody: UserCreateRequest = {
@@ -27,18 +24,12 @@ export default function RegisterPage() {
         password,
       };
 
-      // Add client_id (not in the UserCreateRequest interface)
-      const payload = {
-        ...requestBody,
-        client_id: process.env.NEXT_PUBLIC_CLIENT_ID || "any-login",
-      };
-
-      const response = await fetch(`${apiUrl}/v1/users/register`, {
+      const response = await fetch(`/api/auth/v1/users/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {

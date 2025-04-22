@@ -17,27 +17,13 @@ export default function Home() {
     const fetchUserInfo = async () => {
       setIsLoading(true);
       setError(null);
-      const token = localStorage.getItem("accessToken");
-
-      if (!token) {
-        setIsLoading(false);
-        return; // Not logged in
-      }
-
-      const apiUrl =
-        process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:8000";
 
       try {
-        const response = await fetch(`${apiUrl}/oauth2/userinfo`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        // Call our server-side API route instead of directly calling the OAuth provider
+        const response = await fetch(`/api/auth/oauth2/userinfo`);
 
         if (response.status === 401) {
-          // Token likely expired
-          localStorage.removeItem("accessToken");
-          localStorage.removeItem("refreshToken");
+          // Session likely expired
           setUserInfo(null);
           setError("Session expired. Please log in again.");
         } else if (!response.ok) {
@@ -55,9 +41,6 @@ export default function Home() {
         setError(
           err instanceof Error ? err.message : "Could not load user data."
         );
-        // Clear potentially invalid token
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
         setUserInfo(null);
       } finally {
         setIsLoading(false);
@@ -74,9 +57,6 @@ export default function Home() {
       router.refresh();
     } catch (err) {
       console.error("Logout error:", err);
-      // Even if API call fails, still clear local tokens
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("refreshToken");
       setUserInfo(null);
       router.refresh();
     }

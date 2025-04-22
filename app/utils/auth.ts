@@ -12,31 +12,22 @@ import {
 export async function refreshAccessToken(
   refreshToken: string
 ): Promise<TokenResponse> {
-  const apiUrl =
-    process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:8000";
-  const clientId = process.env.NEXT_PUBLIC_CLIENT_ID || "any-login";
-  const clientSecret = process.env.NEXT_PUBLIC_CLIENT_SECRET || "";
-  const basicAuth = btoa(`${clientId}:${clientSecret}`);
-
   // Create request body
   const requestBody: RefreshTokenGrantRequest = {
     grant_type: "refresh_token",
     refresh_token: refreshToken,
-    client_id: clientId, // Keep for type compatibility
   };
 
   // Convert to Record<string, string> for URLSearchParams
   const formData: Record<string, string> = {
     grant_type: requestBody.grant_type,
     refresh_token: requestBody.refresh_token,
-    // client_id removed from body and sent in the header instead
   };
 
-  const response = await fetch(`${apiUrl}/oauth2/token`, {
+  const response = await fetch(`/api/auth/oauth2/token`, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: `Basic ${basicAuth}`, // Add Basic Auth header
     },
     body: new URLSearchParams(formData),
   });
@@ -63,31 +54,22 @@ export async function revokeToken(
   token: string,
   tokenType: "access_token" | "refresh_token"
 ): Promise<void> {
-  const apiUrl =
-    process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:8000";
-  const clientId = process.env.NEXT_PUBLIC_CLIENT_ID || "any-login";
-  const clientSecret = process.env.NEXT_PUBLIC_CLIENT_SECRET || "";
-  const basicAuth = btoa(`${clientId}:${clientSecret}`);
-
   // Create request body
   const requestBody: TokenRevocationRequest = {
     token,
     token_type_hint: tokenType,
-    client_id: clientId, // Keep for type compatibility
   };
 
   // Convert to Record<string, string> for URLSearchParams
   const formData: Record<string, string> = {
     token: requestBody.token,
     token_type_hint: requestBody.token_type_hint ?? "",
-    // client_id removed from body and sent in the header instead
   };
 
-  const response = await fetch(`${apiUrl}/oauth2/revoke`, {
+  const response = await fetch(`/api/auth/oauth2/revoke`, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: `Basic ${basicAuth}`, // Add Basic Auth header
     },
     body: new URLSearchParams(formData),
   });
@@ -102,23 +84,21 @@ export async function revokeToken(
 }
 
 /**
- * Handles a complete logout by revoking both access and refresh tokens
+ * Handles logout by calling the internal API endpoint which clears HttpOnly cookies.
  */
 export async function logout(): Promise<void> {
-  const accessToken = localStorage.getItem("accessToken");
-  const refreshToken = localStorage.getItem("refreshToken");
-
   try {
-    if (accessToken) {
-      await revokeToken(accessToken, "access_token");
-    }
+    // Call the dedicated logout endpoint
+    const response = await fetch("/api/auth/logout", {
+      method: "POST",
+    });
 
-    if (refreshToken) {
-      await revokeToken(refreshToken, "refresh_token");
+    if (!response.ok) {
+      console.error("Logout API call failed:", response.statusText);
+    } else {
+      console.log("Logout successful via API");
     }
-  } finally {
-    // Clear tokens from localStorage regardless of API success
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
+  } catch (error) {
+    console.error("Error during logout API call:", error);
   }
 }

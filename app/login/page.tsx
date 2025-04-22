@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { PasswordGrantRequest, TokenResponse } from "../types/auth";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -15,35 +14,18 @@ export default function LoginPage() {
     event.preventDefault();
     setError(null);
 
-    const apiUrl =
-      process.env.NEXT_PUBLIC_AUTH_API_URL || "http://localhost:8000";
-    const clientId = process.env.NEXT_PUBLIC_CLIENT_ID || "any-login";
-    // Client secret should be securely stored in environment variables
-    const clientSecret = process.env.NEXT_PUBLIC_CLIENT_SECRET || "";
-    const basicAuth = btoa(`${clientId}:${clientSecret}`);
-
     try {
-      // Prepare request body using our type
-      const requestBody: PasswordGrantRequest = {
-        grant_type: "password",
-        username,
-        password,
-        client_id: clientId, // Keep for type compatibility, but won't be sent in body
-      };
-
       // Convert to Record<string, string> for URLSearchParams
       const formData: Record<string, string> = {
-        grant_type: requestBody.grant_type,
-        username: requestBody.username,
-        password: requestBody.password,
-        // client_id removed from body and sent in the header instead
+        grant_type: "password",
+        username: username,
+        password: password,
       };
 
-      const response = await fetch(`${apiUrl}/oauth2/token`, {
+      const response = await fetch(`/api/auth/oauth2/token`, {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
-          Authorization: `Basic ${basicAuth}`, // Add Basic Auth header
         },
         body: new URLSearchParams(formData),
       });
@@ -55,13 +37,8 @@ export default function LoginPage() {
         );
       }
 
-      const data: TokenResponse = await response.json();
-
-      // Store the tokens in localStorage (in a real app, consider using HttpOnly cookies)
-      localStorage.setItem("accessToken", data.access_token);
-      if (data.refresh_token) {
-        localStorage.setItem("refreshToken", data.refresh_token);
-      }
+      // No need to store tokens as they're now stored in HttpOnly cookies
+      // by the server-side API route
 
       router.push("/"); // Redirect to home page on success
     } catch (err) {

@@ -45,7 +45,7 @@ export interface PasswordGrantRequest {
   username: string; // Can be username or email
   password: string;
   scope?: string; // e.g., "openid profile email"
-  client_id: string;
+  client_id?: string; // Now optional, handled server-side
 }
 
 /**
@@ -55,7 +55,7 @@ export interface RefreshTokenGrantRequest {
   grant_type: "refresh_token";
   refresh_token: string;
   scope?: string;
-  client_id?: string;
+  client_id?: string; // Optional, handled server-side
 }
 
 /**
@@ -64,8 +64,8 @@ export interface RefreshTokenGrantRequest {
 export interface TokenRevocationRequest {
   token: string;
   token_type_hint?: "access_token" | "refresh_token";
-  client_id?: string;
-  client_secret?: string;
+  client_id?: string; // Optional, handled server-side
+  client_secret?: string; // Optional, handled server-side
 }
 
 /**
