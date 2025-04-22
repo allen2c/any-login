@@ -36,14 +36,29 @@ export default function RegisterPage() {
         const errorText = await response.text();
         console.error("Registration error response:", errorText);
         let errorData;
+        let errorMessage = `Registration failed: ${response.statusText}`; // Default message
         try {
           errorData = JSON.parse(errorText);
+          // Enhanced error handling for validation errors
+          if (errorData.detail) {
+            if (Array.isArray(errorData.detail)) {
+              // Format array of validation errors
+              errorMessage = errorData.detail
+                .map(
+                  (err: { loc?: string[]; msg: string }) =>
+                    `${err.loc?.slice(-1)[0] || "Error"}: ${err.msg}`
+                )
+                .join("; ");
+            } else if (typeof errorData.detail === "string") {
+              // Handle if detail is just a string
+              errorMessage = errorData.detail;
+            }
+          }
         } catch {
-          errorData = {};
+          // If parsing fails, use the raw text or default status text
+          errorMessage = errorText || errorMessage;
         }
-        throw new Error(
-          errorData.detail || `Registration failed: ${response.statusText}`
-        );
+        throw new Error(errorMessage);
       }
 
       // Parse response with our typed interface
