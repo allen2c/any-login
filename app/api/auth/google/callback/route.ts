@@ -119,7 +119,8 @@ export async function GET(req: NextRequest) {
         "[Google OAuth] User exists, redirecting to /google-login for:",
         googleUser.email
       );
-      return NextResponse.redirect(
+
+      const redirectResponse = NextResponse.redirect(
         new URL(
           `/google-login?email=${encodeURIComponent(
             googleUser.email
@@ -127,6 +128,23 @@ export async function GET(req: NextRequest) {
           req.url
         )
       );
+
+      // Store Google token in a secure cookie
+      redirectResponse.cookies.set({
+        name: "googleAccessToken",
+        value: tokenData.access_token,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        maxAge: 5 * 60, // 5 minutes, just enough time to complete login
+        sameSite: "lax",
+      });
+
+      console.log(
+        "[Google OAuth] Set Google access token cookie for:",
+        googleUser.email
+      );
+      return redirectResponse;
     }
 
     // For new users, generate a secure password that meets requirements
@@ -233,46 +251,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Add a script to store Google token in sessionStorage
-    // We'll use this for the new "google" grant type
-    const redirectUrl = new URL(
-      `/google-login?email=${encodeURIComponent(
-        googleUser.email
-      )}&id=${encodeURIComponent(googleUser.sub)}`,
-      req.url
-    ).toString();
-
-    const storeTokenScript = `
-      <script>
-        try {
-          sessionStorage.setItem("googleAccessToken", "${tokenData.access_token}");
-          window.location.href = "${redirectUrl}";
-        } catch (e) {
-          console.error("Failed to store token:", e);
-          window.location.href = "${redirectUrl}";
-        }
-      </script>
-    `;
-
-    // Instead of redirecting directly, we'll return HTML with a script
-    // that stores the token, then redirects
-    return new NextResponse(
-      `<!DOCTYPE html>
-      <html>
-        <head>
-          <title>Google Authentication</title>
-        </head>
-        <body>
-          <p>Completing authentication...</p>
-          ${storeTokenScript}
-        </body>
-      </html>`,
-      {
-        headers: {
-          "Content-Type": "text/html",
-        },
-      }
-    );
+    return redirectResponse;
   } catch (error) {
     console.error("[Google OAuth] Google OAuth error:", error);
     return NextResponse.redirect(new URL("/login?error=oauth_failed", req.url));

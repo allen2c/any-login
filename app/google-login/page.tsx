@@ -21,8 +21,16 @@ export default function GoogleLoginPage() {
 
     const completeLogin = async () => {
       try {
-        // Get Google token from sessionStorage, if it was saved during the auth flow
-        const googleToken = sessionStorage.getItem("googleAccessToken");
+        // Get Google token from our API endpoint
+        const tokenResponse = await fetch("/api/auth/google/get-token");
+
+        if (!tokenResponse.ok) {
+          const tokenError = await tokenResponse.json();
+          throw new Error(tokenError.error || "Failed to get Google token");
+        }
+
+        const { googleToken } = await tokenResponse.json();
+
         if (!googleToken) {
           setError(
             "Google authentication token missing. Please try signing in again."
