@@ -22,7 +22,14 @@ export default function GoogleLoginPage() {
     const completeLogin = async () => {
       try {
         // Get Google token from sessionStorage, if it was saved during the auth flow
-        const googleToken = sessionStorage.getItem("googleAccessToken") || "";
+        const googleToken = sessionStorage.getItem("googleAccessToken");
+        if (!googleToken) {
+          setError(
+            "Google authentication token missing. Please try signing in again."
+          );
+          setIsLoading(false);
+          return;
+        }
 
         // Call special endpoint for Google login
         const response = await fetch("/api/auth/google/complete-login", {

@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
   try {
     const { email, googleId, googleToken } = await req.json();
 
-    if (!email || !googleId) {
+    if (!email || !googleId || !googleToken) {
       return NextResponse.json(
         { error: "Missing required parameters" },
         { status: 400 }
