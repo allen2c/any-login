@@ -59,6 +59,18 @@ export interface RefreshTokenGrantRequest {
 }
 
 /**
+ * Request body for the Google grant type
+ */
+export interface GoogleGrantRequest {
+  grant_type: "google";
+  email: string;
+  google_id: string;
+  google_token: string;
+  scope?: string;
+  client_id?: string; // Optional, handled server-side
+}
+
+/**
  * Request body for token revocation
  */
 export interface TokenRevocationRequest {

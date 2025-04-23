@@ -6,7 +6,7 @@ const AUTH_API_URL = process.env.AUTH_API_URL || "http://localhost:8000";
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, googleId } = await req.json();
+    const { email, googleId, googleToken } = await req.json();
 
     if (!email || !googleId) {
       return NextResponse.json(
@@ -15,7 +15,61 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // First, explicitly check if user exists
+    // First, try to use the new "google" grant type
+    // This will handle both new users and existing users automatically on the backend
+    const tokenResponse = await fetch(`${AUTH_API_URL}/oauth2/token`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        ...getAuthHeaders(),
+      },
+      body: new URLSearchParams({
+        grant_type: "google",
+        email,
+        google_id: googleId,
+        google_token: googleToken || "", // If not available, send empty string
+        scope: "openid profile email",
+      }),
+    });
+
+    // If the backend supports the new grant type, we're done
+    if (tokenResponse.ok) {
+      const tokens = await tokenResponse.json();
+
+      // Set tokens in cookies
+      const response = NextResponse.json({ success: true });
+
+      if (tokens.access_token) {
+        response.cookies.set({
+          name: "accessToken",
+          value: tokens.access_token,
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          path: "/",
+          maxAge: tokens.expires_in || 3600,
+          sameSite: "lax",
+        });
+      }
+
+      if (tokens.refresh_token) {
+        response.cookies.set({
+          name: "refreshToken",
+          value: tokens.refresh_token,
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          path: "/",
+          maxAge: 7 * 24 * 60 * 60, // 7 days
+          sameSite: "lax",
+        });
+      }
+
+      return response;
+    }
+
+    // If the backend doesn't support the new grant type yet,
+    // fall back to the previous behavior for backward compatibility
+
+    // Check if user exists
     const userCheckResponse = await fetch(
       `${AUTH_API_URL}/v1/users/check?email=${encodeURIComponent(email)}`,
       { headers: getAuthHeaders() }
@@ -67,7 +121,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get auth token for the newly registered user
-    const tokenResponse = await fetch(`${AUTH_API_URL}/oauth2/token`, {
+    const fallbackTokenResponse = await fetch(`${AUTH_API_URL}/oauth2/token`, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -81,34 +135,34 @@ export async function POST(req: NextRequest) {
       }),
     });
 
-    if (!tokenResponse.ok) {
+    if (!fallbackTokenResponse.ok) {
       return NextResponse.json(
         { error: "Failed to authenticate after registration" },
         { status: 500 }
       );
     }
 
-    const tokens = await tokenResponse.json();
+    const fallbackTokens = await fallbackTokenResponse.json();
 
     // Set tokens in cookies
-    const response = NextResponse.json({ success: true });
+    const fallbackResponse = NextResponse.json({ success: true });
 
-    if (tokens.access_token) {
-      response.cookies.set({
+    if (fallbackTokens.access_token) {
+      fallbackResponse.cookies.set({
         name: "accessToken",
-        value: tokens.access_token,
+        value: fallbackTokens.access_token,
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         path: "/",
-        maxAge: tokens.expires_in || 3600,
+        maxAge: fallbackTokens.expires_in || 3600,
         sameSite: "lax",
       });
     }
 
-    if (tokens.refresh_token) {
-      response.cookies.set({
+    if (fallbackTokens.refresh_token) {
+      fallbackResponse.cookies.set({
         name: "refreshToken",
-        value: tokens.refresh_token,
+        value: fallbackTokens.refresh_token,
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         path: "/",
@@ -117,7 +171,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return response;
+    return fallbackResponse;
   } catch (error) {
     console.error("Complete login error:", error);
     return NextResponse.json(

@@ -21,6 +21,9 @@ export default function GoogleLoginPage() {
 
     const completeLogin = async () => {
       try {
+        // Get Google token from sessionStorage, if it was saved during the auth flow
+        const googleToken = sessionStorage.getItem("googleAccessToken") || "";
+
         // Call special endpoint for Google login
         const response = await fetch("/api/auth/google/complete-login", {
           method: "POST",
@@ -30,6 +33,7 @@ export default function GoogleLoginPage() {
           body: JSON.stringify({
             email,
             googleId,
+            googleToken,
           }),
         });
 
