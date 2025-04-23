@@ -15,11 +15,59 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Generate a secure random password that meets requirements
+    // First, explicitly check if user exists
+    const userCheckResponse = await fetch(
+      `${AUTH_API_URL}/v1/users/check?email=${encodeURIComponent(email)}`,
+      { headers: getAuthHeaders() }
+    );
+
+    const userExists =
+      userCheckResponse.ok && (await userCheckResponse.json()).exists;
+
+    if (userExists) {
+      // For existing users, return a more helpful message
+      return NextResponse.json(
+        {
+          error: "Account already exists",
+          message:
+            "This email is already registered. Please log in with your password first, then link your Google account from your profile.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Only proceed with registration for new users
     const userPassword = generateSecurePassword();
 
-    // Get JWT token from any-auth using password grant
-    const tokenGrantResponse = await fetch(`${AUTH_API_URL}/oauth2/token`, {
+    // Register the new user
+    const registerResponse = await fetch(`${AUTH_API_URL}/v1/users/register`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({
+        username: `google_${email
+          .split("@")[0]
+          .replace(/[^a-zA-Z0-9_-]/g, "_")}_${Date.now().toString().slice(-6)}`,
+        email: email,
+        password: userPassword,
+        metadata: {
+          google_id: googleId,
+          auth_provider: "google",
+        },
+      }),
+    });
+
+    if (!registerResponse.ok) {
+      return NextResponse.json(
+        { error: "Failed to register user" },
+        { status: 500 }
+      );
+    }
+
+    // Get auth token for the newly registered user
+    const tokenResponse = await fetch(`${AUTH_API_URL}/oauth2/token`, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -33,94 +81,14 @@ export async function POST(req: NextRequest) {
       }),
     });
 
-    if (!tokenGrantResponse.ok) {
-      // If login fails with the generated password, we might need to register the user
-      const registerResponse = await fetch(
-        `${AUTH_API_URL}/v1/users/register`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...getAuthHeaders(),
-          },
-          body: JSON.stringify({
-            username: `google_${email
-              .split("@")[0]
-              .replace(/[^a-zA-Z0-9_-]/g, "_")}_${Date.now()
-              .toString()
-              .slice(-6)}`,
-            email: email,
-            password: userPassword,
-            metadata: {
-              google_id: googleId,
-              auth_provider: "google",
-            },
-          }),
-        }
+    if (!tokenResponse.ok) {
+      return NextResponse.json(
+        { error: "Failed to authenticate after registration" },
+        { status: 500 }
       );
-
-      if (!registerResponse.ok) {
-        return NextResponse.json(
-          { error: "Failed to register user" },
-          { status: 500 }
-        );
-      }
-
-      // Try again with the new account
-      const retryTokenResponse = await fetch(`${AUTH_API_URL}/oauth2/token`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          ...getAuthHeaders(),
-        },
-        body: new URLSearchParams({
-          grant_type: "password",
-          username: email,
-          password: userPassword,
-          scope: "openid profile email",
-        }),
-      });
-
-      if (!retryTokenResponse.ok) {
-        return NextResponse.json(
-          { error: "Failed to authenticate after registration" },
-          { status: 500 }
-        );
-      }
-
-      const tokens = await retryTokenResponse.json();
-
-      // Set tokens in cookies
-      const response = NextResponse.json({ success: true });
-
-      if (tokens.access_token) {
-        response.cookies.set({
-          name: "accessToken",
-          value: tokens.access_token,
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          path: "/",
-          maxAge: tokens.expires_in || 3600,
-          sameSite: "lax",
-        });
-      }
-
-      if (tokens.refresh_token) {
-        response.cookies.set({
-          name: "refreshToken",
-          value: tokens.refresh_token,
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          path: "/",
-          maxAge: 7 * 24 * 60 * 60, // 7 days
-          sameSite: "lax",
-        });
-      }
-
-      return response;
     }
 
-    const tokens = await tokenGrantResponse.json();
+    const tokens = await tokenResponse.json();
 
     // Set tokens in cookies
     const response = NextResponse.json({ success: true });
