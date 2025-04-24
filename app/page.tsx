@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { UserInfo } from "./types/auth";
-import { logout } from "./utils/auth";
 
 export default function Home() {
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
@@ -23,8 +22,8 @@ export default function Home() {
       setError(null);
 
       try {
-        // Call our server-side API route instead of directly calling the OAuth provider
-        const response = await fetch(`/api/auth/oauth2/userinfo`);
+        // Call our server-side API route
+        const response = await fetch(`/api/me`);
 
         if (response.status === 401) {
           // Session likely expired
@@ -41,18 +40,10 @@ export default function Home() {
           setUserInfo(data);
 
           // If we have userInfo and redirectUri, redirect back to any-me
+          // This would be handled server-side in a real implementation
           if (redirectUri && data) {
-            // Get the token from cookies or fetch it from a dedicated endpoint
-            // Since we can't directly access httpOnly cookies, we need a server API to help
-            const tokenResponse = await fetch("/api/auth/getToken");
-            if (tokenResponse.ok) {
-              const { token } = await tokenResponse.json();
-              // Construct the redirect URL with token
-              const redirectUrl = new URL(redirectUri);
-              redirectUrl.searchParams.set("token", token);
-              // Redirect to any-me
-              window.location.href = redirectUrl.toString();
-            }
+            // Construct the redirect URL
+            window.location.href = redirectUri;
           }
         }
       } catch (err) {
@@ -71,7 +62,15 @@ export default function Home() {
 
   const handleLogout = async () => {
     try {
-      await logout();
+      // Call our server-side logout API route
+      const response = await fetch("/api/logout", {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("Logout failed");
+      }
+
       setUserInfo(null);
       router.refresh();
     } catch (err) {
