@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { UserInfo } from "./types/auth";
@@ -12,6 +12,10 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Get redirect_uri from URL if present
+  const redirectUri = searchParams.get("redirect_uri");
 
   useEffect(() => {
     const fetchUserInfo = async () => {
@@ -35,6 +39,21 @@ export default function Home() {
         } else {
           const data: UserInfo = await response.json();
           setUserInfo(data);
+
+          // If we have userInfo and redirectUri, redirect back to any-me
+          if (redirectUri && data) {
+            // Get the token from cookies or fetch it from a dedicated endpoint
+            // Since we can't directly access httpOnly cookies, we need a server API to help
+            const tokenResponse = await fetch("/api/auth/getToken");
+            if (tokenResponse.ok) {
+              const { token } = await tokenResponse.json();
+              // Construct the redirect URL with token
+              const redirectUrl = new URL(redirectUri);
+              redirectUrl.searchParams.set("token", token);
+              // Redirect to any-me
+              window.location.href = redirectUrl.toString();
+            }
+          }
         }
       } catch (err) {
         console.error("Failed to fetch user info:", err);
@@ -48,7 +67,7 @@ export default function Home() {
     };
 
     fetchUserInfo();
-  }, []);
+  }, [redirectUri]);
 
   const handleLogout = async () => {
     try {
@@ -105,13 +124,21 @@ export default function Home() {
           <p className="mb-4">You are not logged in.</p>
           <div className="flex gap-4">
             <Link
-              href="/login"
+              href={
+                redirectUri
+                  ? `/login?redirect_uri=${encodeURIComponent(redirectUri)}`
+                  : "/login"
+              }
               className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
             >
               Login
             </Link>
             <Link
-              href="/register"
+              href={
+                redirectUri
+                  ? `/register?redirect_uri=${encodeURIComponent(redirectUri)}`
+                  : "/register"
+              }
               className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
             >
               Register

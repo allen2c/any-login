@@ -10,6 +10,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const redirectUri = searchParams.get("redirect_uri");
 
   useEffect(() => {
     const errorParam = searchParams.get("error");
@@ -46,10 +47,22 @@ export default function LoginPage() {
         );
       }
 
+      // Get token data if we need to redirect with the token
+      if (redirectUri) {
+        const tokenData = await response.json();
+        // Redirect to the original application with the token
+        if (tokenData.access_token) {
+          const redirectUrl = new URL(redirectUri);
+          redirectUrl.searchParams.set("token", tokenData.access_token);
+          window.location.href = redirectUrl.toString();
+          return;
+        }
+      }
+
       // No need to store tokens as they're now stored in HttpOnly cookies
       // by the server-side API route
 
-      router.push("/"); // Redirect to home page on success
+      router.push("/"); // Redirect to home page on success if no redirectUri
     } catch (err) {
       console.error("Login error:", err);
       setError(
@@ -105,7 +118,11 @@ export default function LoginPage() {
             Sign In
           </button>
           <Link
-            href="/register"
+            href={
+              redirectUri
+                ? `/register?redirect_uri=${encodeURIComponent(redirectUri)}`
+                : "/register"
+            }
             className="inline-block align-baseline font-bold text-sm text-blue-500 hover:text-blue-800"
           >
             Register
@@ -127,7 +144,14 @@ export default function LoginPage() {
         </div>
 
         <button
-          onClick={() => (window.location.href = "/api/auth/google/login")}
+          onClick={() => {
+            const googleLoginUrl = redirectUri
+              ? `/api/auth/google/login?redirect_uri=${encodeURIComponent(
+                  redirectUri
+                )}`
+              : "/api/auth/google/login";
+            window.location.href = googleLoginUrl;
+          }}
           type="button"
           className="mt-4 w-full flex justify-center items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 font-medium py-2 px-4 border border-gray-300 rounded-md shadow-sm transition-colors"
         >

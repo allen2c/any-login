@@ -1,2 +1,3 @@
 dump-codebase:
-	codepress . --output build/codebase.txt --inspect
+	mkdir -p out
+	codepress . --output out/codebase.txt --inspect
