@@ -22,8 +22,19 @@ export default function Home() {
       setError(null);
 
       try {
-        // Call our server-side API route
-        const response = await fetch(`/api/me`);
+        // Get access token from localStorage
+        const accessToken = localStorage.getItem("accessToken");
+
+        // Prepare headers for the request
+        const headers: HeadersInit = {};
+        if (accessToken) {
+          headers["Authorization"] = `Bearer ${accessToken}`;
+        }
+
+        // Call our server-side API route with the access token
+        const response = await fetch(`/api/me`, {
+          headers,
+        });
 
         if (response.status === 401) {
           // Session likely expired
@@ -62,6 +73,9 @@ export default function Home() {
 
   const handleLogout = async () => {
     try {
+      // Clear token from localStorage
+      localStorage.removeItem("accessToken");
+
       // Call our server-side logout API route
       const response = await fetch("/api/logout", {
         method: "POST",

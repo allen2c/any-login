@@ -28,29 +28,54 @@ async function handler(
   const slug = slugArray.join("/");
   const targetUrl = `${AUTH_API_URL}/${slug}`;
 
+  // Forward headers from the incoming request
+  const headers = new Headers();
+  req.headers.forEach((value, key) => {
+    // Don't forward host, connection, cookie or content-length headers
+    if (
+      !["host", "connection", "cookie", "content-length"].includes(
+        key.toLowerCase()
+      )
+    ) {
+      headers.append(key, value);
+    }
+  });
+
+  // Get the incoming Authorization header (if any)
+  const incomingAuthHeader = req.headers.get("Authorization");
   // Get tokens from request cookies
   const accessToken = req.cookies.get("accessToken")?.value;
 
-  const headers = new Headers(req.headers);
-  headers.delete("host");
-  headers.delete("cookie");
-
-  // Add Authorization header if required by the specific any-auth endpoint
-  if (slug === "oauth2/userinfo" && accessToken) {
+  // Add Authorization header based on request type
+  if (slug === "oauth2/userinfo" && incomingAuthHeader) {
+    // IMPORTANT FIX: If it's a userinfo request AND we received an Auth header, forward THAT header
+    headers.set("Authorization", incomingAuthHeader);
+    console.log(`[Proxy /${slug}] Forwarding received Authorization header.`);
+  } else if (slug === "oauth2/userinfo" && accessToken) {
+    // Fallback to cookie-based token if no incoming Auth header
     headers.set("Authorization", `Bearer ${accessToken}`);
+    console.log(`[Proxy /${slug}] Using accessToken from cookie.`);
   } else if (
     slug === "oauth2/token" ||
     slug === "oauth2/revoke" ||
-    slug === "v1/users/register"
+    slug.startsWith("v1/users/register")
   ) {
+    // For token, revoke, register: Use Basic Auth if configured
     const basicAuth = getBasicAuthHeader();
     if (basicAuth) {
       headers.set("Authorization", basicAuth);
+      console.log(`[Proxy /${slug}] Using Basic Auth.`);
     } else {
-      console.warn(`Client credentials not configured for slug: ${slug}`);
+      // Clear any potentially forwarded bearer token for these specific routes
+      headers.delete("Authorization");
+      console.warn(
+        `[Proxy /${slug}] Client credentials not configured. No Auth header sent.`
+      );
     }
   } else {
+    // For other requests, clear any potentially forwarded Authorization header
     headers.delete("Authorization");
+    console.log(`[Proxy /${slug}] Removed Authorization header.`);
   }
 
   try {
@@ -69,10 +94,24 @@ async function handler(
         params.append(key, value.toString());
       });
       body = params;
+      // Ensure correct content-type is set if we rebuilt the body
       headers.set("Content-Type", "application/x-www-form-urlencoded");
     } else if (req.body) {
-      body = await req.arrayBuffer();
+      // Check if body exists before reading
+      if (req.headers.get("content-length") !== "0") {
+        try {
+          body = await req.arrayBuffer();
+        } catch (e) {
+          // Handle cases where body might not be readable
+          console.warn(`[Proxy /${slug}] Could not read request body:`, e);
+          body = null;
+        }
+      } else {
+        body = null; // Explicitly set body to null for GET/HEAD etc.
+      }
     }
+
+    console.log(`[Proxy /${slug}] Forwarding request to: ${targetUrl}`);
 
     const response = await fetch(targetUrl, {
       method: req.method,
@@ -81,11 +120,15 @@ async function handler(
       redirect: "manual",
     });
 
+    console.log(
+      `[Proxy /${slug}] Received response status: ${response.status} from ${targetUrl}`
+    );
+
     // Handle token responses specifically to store tokens in HttpOnly cookies
     if (slug === "oauth2/token" && response.ok) {
       const tokenData = await response.json();
       const responseHeaders = new Headers(response.headers);
-      responseHeaders.delete("set-cookie");
+      responseHeaders.delete("set-cookie"); // Don't proxy set-cookie from backend
 
       // Create response to return
       const nextResponse = NextResponse.json(tokenData, {
@@ -94,8 +137,10 @@ async function handler(
       });
 
       // Set HttpOnly cookies for tokens
+      const isSecure = process.env.NODE_ENV === "production";
+      const refreshTokenMaxAge = 7 * 24 * 60 * 60; // 7 days
+
       if (tokenData.access_token) {
-        const isSecure = process.env.NODE_ENV === "production";
         nextResponse.cookies.set({
           name: "accessToken",
           value: tokenData.access_token,
@@ -107,8 +152,6 @@ async function handler(
         });
       }
       if (tokenData.refresh_token) {
-        const isSecure = process.env.NODE_ENV === "production";
-        const refreshTokenMaxAge = 7 * 24 * 60 * 60; // 7 days
         nextResponse.cookies.set({
           name: "refreshToken",
           value: tokenData.refresh_token,
@@ -132,6 +175,12 @@ async function handler(
     // For other requests, proxy the response body and status directly
     const responseBody = await response.arrayBuffer();
     const responseHeaders = new Headers(response.headers);
+    // Clean up headers before sending back to client
+    responseHeaders.delete("set-cookie"); // Don't forward set-cookie from backend
+    responseHeaders.delete("transfer-encoding"); // Avoid issues with chunked encoding
+    responseHeaders.delete("connection");
+
+    // Ensure content-type is preserved
     if (response.headers.get("content-type")) {
       responseHeaders.set(
         "content-type",
@@ -139,7 +188,17 @@ async function handler(
       );
     }
 
-    return new NextResponse(responseBody, {
+    // Ensure content-length matches actual body length if not chunked
+    if (
+      responseBody.byteLength > 0 &&
+      !responseHeaders.get("transfer-encoding")
+    ) {
+      responseHeaders.set("content-length", responseBody.byteLength.toString());
+    } else if (responseBody.byteLength === 0) {
+      responseHeaders.delete("content-length");
+    }
+
+    return new NextResponse(responseBody.byteLength > 0 ? responseBody : null, {
       status: response.status,
       statusText: response.statusText,
       headers: responseHeaders,

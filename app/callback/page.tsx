@@ -10,14 +10,18 @@ export default function Callback() {
   useEffect(() => {
     const error = searchParams.get("error");
     const errorDescription = searchParams.get("error_description");
+    const token = searchParams.get("token");
 
     if (error) {
       console.error("Auth error:", error, errorDescription);
       router.push(`/?error=${encodeURIComponent(errorDescription || error)}`);
+    } else if (token) {
+      // Store the token received from any-login
+      console.log("Authentication successful, received token");
+      localStorage.setItem("accessToken", token);
+      router.push("/");
     } else {
-      // Successfully logged in through any-login
-      // No need to extract token from URL - cookies will be sent automatically
-      console.log("Authentication successful, redirecting to home");
+      console.warn("No token received in callback");
       router.push("/");
     }
   }, [router, searchParams]);
